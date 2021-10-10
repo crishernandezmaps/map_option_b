@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Mineria Ilegal Amazonas Venezolano</title>
+        <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+        <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+        <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+        <style>
+            body{ 
+                margin: 0; 
+                padding: 0;
+            }
+            #map{ 
+                position: absolute; 
+                top: 0; 
+                bottom: 0; 
+                width: 100%; 
+            }
+            .airfield {
+                background-image: url('./static/img/airport.png');
+                background-size: cover;
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                cursor: pointer;
+            } 
+        </style>
+    </head>
+    <body>
+        <div id="map"></div>
+        <script>
+            mapboxgl.accessToken = 'pk.eyJ1IjoiY3Jpc2hlcm5hbmRlem1hcHMiLCJhIjoiY2tvYTRqYTVoMm5mejJwcXdta3UyZzI1byJ9.pqKQkOPvqB-1gmuTdkYzQg';
+            const mapbox_styles = [
+                'mapbox://styles/mapbox/dark-v10',  // 0
+                'mapbox://styles/mapbox/satellite-v9',  // 1
+            ]   
+            const map = new mapboxgl.Map({
+                container: 'map',
+                style: mapbox_styles[1],
+                center: [-64.3203141, 6.0137088],  
+                zoom: 5
+            });    
+
+            map.on('load', () => {
+                const data_ = 'https://gist.githubusercontent.com/crishernandezmaps/57ed7b679347f511cb286a4c998e8757/raw/06b1d8b3b95d36f115bc137842e00ab55649717d/mining.geojson'
+                
+                map.addSource('mining', {
+                    type: 'geojson',
+                    data: data_,
+                    cluster: true,
+                    clusterMaxZoom: 14, // Max zoom to cluster points on
+                    clusterRadius: 50 // Radius of each cluster when clustering points (defaults to 50)
+                });
+
+                map.addLayer({
+                    id: 'clusters',
+                    type: 'circle',
+                    source: 'mining',
+                    filter: ['has', 'point_count'],
+                    paint: {
+                        // Use step expressions (https://docs.mapbox.com/mapbox-gl-js/style-spec/#expressions-step)
+                        // with three steps to implement three types of circles:
+                        //   * Blue, 20px circles when point count is less than 100
+                        //   * Yellow, 30px circles when point count is between 100 and 750
+                        //   * Pink, 40px circles when point count is greater than or equal to 750
+                        'circle-color': [
+                            'step',
+                            ['get', 'point_count'],
+                            '#51bbd6',
+                            100,
+                            '#f1f075',
+                            750,
+                            '#f28cb1'
+                        ],
+                        'circle-radius': [
+                            'step',
+                            ['get', 'point_count'],
+                            20,
+                            100,
+                            30,
+                            750,
+                            40
+                        ]
+                    }
+                });
+
+                map.addLayer({
+                    id: 'cluster-count',
+                    type: 'symbol',
+                    source: 'mining',
+                    filter: ['has', 'point_count'],
+                    layout: {
+                        'text-field': '{point_count_abbreviated}',
+                        'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                        'text-size': 12
+                    }
+                });
+
+                map.addLayer({
+                    id: 'unclustered-point',
+                    type: 'circle',
+                    source: 'mining',
+                    filter: ['!', ['has', 'point_count']],
+                    paint: {
+                        'circle-color': '#11b4da',
+                        'circle-radius': 4,
+                        'circle-stroke-width': 1,
+                        'circle-stroke-color': '#fff'
+                    }
+                });   
+                
+                // AIRFIELDS //
+                const airfields = 'https://gist.githubusercontent.com/crishernandezmaps/8990bcb9b5c4599aeb1b825852109439/raw/c6ee6acf3f3a57cbdee7dce949280ff44ecf5d16/airfields.geojson'
+                map.addSource('airfields', {type: 'geojson', data: airfields})
+                map.addLayer({
+                    id: 'airfields',
+                    type: 'circle',
+                    source: 'airfields',
+                    paint: {
+                        'circle-radius': 5,
+                        'circle-stroke-width': 0.1,
+                        'circle-color': '#e30ec7',
+                        'circle-stroke-color': 'white'
+                    }                                        
+                });                              
+
+                // Country-Estates //
+                const country = 'https://gist.githubusercontent.com/crishernandezmaps/9a2ae2f57ecd0fc498911fa460f67c77/raw/d15ca38bbf32faed62589d528a0336dc33902393/venezuela_boundaries.geojson'
+                map.addSource('country', {type: 'geojson', data: country})
+                map.addLayer({
+                        'id': 'country',
+                        'type': 'fill',
+                        'source': 'country',
+                        'layout': {},
+                        'paint': {
+                            'fill-color': 'rgba(227,14,199)', // blue color fill
+                            'fill-opacity': 0.2
+                        },
+                        'filter': ['==', '$type', 'Polygon']
+                }); 
+                map.addLayer({
+                    'id': 'outline_country',
+                    'type': 'line',
+                    'source': 'country',
+                    'layout': {},
+                    'paint': {
+                        'line-color': 'rgba(102, 8, 16,0.8)',
+                        'line-width': 2
+                    },
+                    'filter': ['==', '$type', 'Polygon']        
+                });                  
+                
+                const estates = 'https://gist.githubusercontent.com/crishernandezmaps/17ab20c5b8666a4c471d14f998117348/raw/1c9056d0f5d2d76fe5769068a4e0dd0ac0fc2c96/selected_estates.geojson'
+                map.addSource('estates', {type: 'geojson', data: estates}) 
+                map.addLayer({
+                        'id': 'estates',
+                        'type': 'fill',
+                        'source': 'estates',
+                        'layout': {},
+                        'paint': {
+                            'fill-color': 'rgba(227,14,199)', // blue color fill
+                            'fill-opacity': 0.2
+                        },
+                        'filter': ['==', '$type', 'Polygon']
+                }); 
+                map.addLayer({
+                    'id': 'outline_estates',
+                    'type': 'line',
+                    'source': 'estates',
+                    'layout': {},
+                    'paint': {
+                        'line-color': 'rgba(217, 15, 32,0.8)',
+                        'line-width': 2
+                    },
+                    'filter': ['==', '$type', 'Polygon']        
+                });                                               
+
+                // inspect a cluster on click
+                map.on('click', 'clusters', (e) => {
+                    const features = map.queryRenderedFeatures(e.point, {
+                        layers: ['clusters']
+                    });
+                    const clusterId = features[0].properties.cluster_id;
+                    map.getSource('mining').getClusterExpansionZoom(
+                        clusterId,
+                        (err, zoom) => {
+                            if (err) return;
+
+                            map.easeTo({
+                                center: features[0].geometry.coordinates,
+                                zoom: zoom
+                            });
+                        }
+                    );
+                });
+
+                map.on('mouseenter', 'clusters', () => {
+                    map.getCanvas().style.cursor = 'pointer';
+                });
+                map.on('mouseleave', 'clusters', () => {
+                    map.getCanvas().style.cursor = '';
+                });        
+            });
+        </script>
+
+    </body>
+</html>
